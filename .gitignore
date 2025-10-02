@@ -1,0 +1,7 @@
+venv/
+__pycache__/
+*.pyc
+*.joblib
+enriched_wait_data.csv
+*.ipynb_checkpoints/
+.DS_Store
