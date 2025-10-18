@@ -3,7 +3,12 @@ import numpy as np
 import holidays
 from sklearn.model_selection import train_test_split, RandomizedSearchCV
 from sklearn.ensemble import RandomForestRegressor, HistGradientBoostingRegressor
-from sklearn.metrics import mean_squared_error
+from sklearn.metrics import (
+    mean_squared_error,
+    mean_absolute_error,
+    median_absolute_error,
+    r2_score,
+)
 import joblib
 
 # === 1) Load enriched data ===
@@ -23,7 +28,7 @@ df['sched_date'] = df['x_ScheduledDTTM'].dt.normalize()
 us_hols = holidays.US()
 df['is_holiday'] = df['sched_date'].isin(us_hols)
 
-# fixed‐date holidays + Thanksgiving/Black Friday
+# fixed-date holidays + Thanksgiving/Black Friday
 fixed_events = {
     "New Year": "01-01",
     "Valentine": "02-14",
@@ -53,7 +58,7 @@ df = df.merge(events_df, left_on='sched_date', right_on='date', how='left')
 df['is_event'] = df['event'].notna()
 df.drop(columns=['date','event'], inplace=True)
 
-# === 4) Queue‐status features ===
+# === 4) Queue-status features ===
 queue_cols = [
     'SumHowEarlyWaiting','AvgHowEarlyWaiting',
     'LineCount0','LineCount1','LineCount2','LineCount3','LineCount4',
@@ -71,7 +76,7 @@ df['dow_cos']  = np.cos(2*np.pi*df['dow']/7)
 df['hour_sin'] = np.sin(2*np.pi*df['hour']/24)
 df['hour_cos'] = np.cos(2*np.pi*df['hour']/24)
 
-# === 6) Recent‐history features ===
+# === 6) Recent-history features ===
 # rolling average wait in the last 30, 60 minutes
 df = df.sort_values('x_ArrivalDTTM')
 df['recent_wait_30min'] = df.rolling('30min', on='x_ArrivalDTTM')['Wait'].mean()
@@ -84,7 +89,7 @@ feature_cols = [
     'servers','Wq_analytic_min','Wq_simulated_480min',
     # scanner & demographic
     'NumScannersUsedToday','InProgressSize','SumInProgress','NumCompletedToday',
-    # queue‐status
+    # queue-status
 ] + queue_cols + [
     # holiday/event
     'is_holiday','is_event',
@@ -108,7 +113,14 @@ X_train, X_test, y_train, y_test = train_test_split(
     X, y, test_size=0.2, random_state=42
 )
 
-# === 9) Random Forest with hyper‐parameter search ===
+# === 8a) Simple baseline for context ===
+baseline_pred = np.full_like(y_test, y_train.mean(), dtype=float)
+baseline_rmse = np.sqrt(mean_squared_error(y_test, baseline_pred))
+baseline_mae = mean_absolute_error(y_test, baseline_pred)
+print(f"Baseline (predict mean) RMSE: {baseline_rmse:.2f} minutes")
+print(f"Baseline (predict mean) MAE:  {baseline_mae:.2f} minutes")
+
+# === 9) Random Forest with hyper-parameter search ===
 param_dist = {
     'n_estimators': [100,200,500],
     'max_depth': [None,10,20],
@@ -123,17 +135,35 @@ rf_search = RandomizedSearchCV(
 )
 rf_search.fit(X_train, y_train)
 best_rf = rf_search.best_estimator_
-rf_rmse = np.sqrt(mean_squared_error(y_test, best_rf.predict(X_test)))
+rf_preds = best_rf.predict(X_test)
+rf_rmse = np.sqrt(mean_squared_error(y_test, rf_preds))
+rf_mae = mean_absolute_error(y_test, rf_preds)
+rf_medae = median_absolute_error(y_test, rf_preds)
+rf_r2 = r2_score(y_test, rf_preds)
+rf_p90 = np.percentile(np.abs(y_test - rf_preds), 90)
 print("RF best params:", rf_search.best_params_)
 print(f"RF RMSE: {rf_rmse:.2f} minutes")
+print(f"RF MAE:  {rf_mae:.2f} minutes")
+print(f"RF Median AE: {rf_medae:.2f} minutes")
+print(f"RF 90th percentile AE: {rf_p90:.2f} minutes")
+print(f"RF R^2: {rf_r2:.3f}")
 
 # === 10) Gradient Boosting baseline ===
 gb = HistGradientBoostingRegressor(
     max_iter=200, learning_rate=0.1, random_state=42
 )
 gb.fit(X_train, y_train)
-gb_rmse = np.sqrt(mean_squared_error(y_test, gb.predict(X_test)))
+gb_preds = gb.predict(X_test)
+gb_rmse = np.sqrt(mean_squared_error(y_test, gb_preds))
+gb_mae = mean_absolute_error(y_test, gb_preds)
+gb_medae = median_absolute_error(y_test, gb_preds)
+gb_r2 = r2_score(y_test, gb_preds)
+gb_p90 = np.percentile(np.abs(y_test - gb_preds), 90)
 print(f"HGB RMSE: {gb_rmse:.2f} minutes")
+print(f"HGB MAE:  {gb_mae:.2f} minutes")
+print(f"HGB Median AE: {gb_medae:.2f} minutes")
+print(f"HGB 90th percentile AE: {gb_p90:.2f} minutes")
+print(f"HGB R^2: {gb_r2:.3f}")
 
 # === 11) Save models ===
 joblib.dump(best_rf, r"C:\Users\mhdto\OneDrive\Documents\Project DWT\rf_model.joblib")
