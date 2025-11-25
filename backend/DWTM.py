@@ -11,19 +11,16 @@ from sklearn.metrics import (
 )
 import joblib
 
-# === 1) Load enriched data ===
 csv_path = r"C:\Users\mhdto\OneDrive\Documents\Project DWT\enriched_wait_data.csv"
 df = pd.read_csv(
     csv_path,
     parse_dates=['x_ArrivalDTTM','x_ScheduledDTTM','x_BeginDTTM']
 )
 
-# === 2) Basic datetime & arrival/service features ===
+# Basic datetime & arrival/service features ===
 # arrival_delta_min, est_service_time_min, lambda_per_min, mu_per_min, servers, Wq_analytic_min, Wq_simulated_480min,
 # lambda_hat_per_hr, exp_scale_min, weibull_shape, weibull_scale
-# (these were already in your CSV)
 
-# === 3) Holiday & event flags ===
 df['sched_date'] = df['x_ScheduledDTTM'].dt.normalize()
 us_hols = holidays.US()
 df['is_holiday'] = df['sched_date'].isin(us_hols)
@@ -58,17 +55,17 @@ df = df.merge(events_df, left_on='sched_date', right_on='date', how='left')
 df['is_event'] = df['event'].notna()
 df.drop(columns=['date','event'], inplace=True)
 
-# === 4) Queue-status features ===
+# Queue-status features 
 queue_cols = [
     'SumHowEarlyWaiting','AvgHowEarlyWaiting',
     'LineCount0','LineCount1','LineCount2','LineCount3','LineCount4',
     'SumWaits','DelayCount','DelayCountLastHour',
     'AvgWaitByTaskTypeLine','DelayedInLine'
 ]
-# make sure all queue_cols are in df; drop any missing
+# Gotta make sure all queue_cols are in df; drop any missing
 queue_cols = [c for c in queue_cols if c in df.columns]
 
-# === 5) Cyclical time features ===
+#Cyclical time features
 df['dow']      = df['x_ScheduledDTTM'].dt.dayofweek
 df['hour']     = df['x_ScheduledDTTM'].dt.hour
 df['dow_sin']  = np.sin(2*np.pi*df['dow']/7)
@@ -76,13 +73,13 @@ df['dow_cos']  = np.cos(2*np.pi*df['dow']/7)
 df['hour_sin'] = np.sin(2*np.pi*df['hour']/24)
 df['hour_cos'] = np.cos(2*np.pi*df['hour']/24)
 
-# === 6) Recent-history features ===
-# rolling average wait in the last 30, 60 minutes
+# Recent-history features High Imp!!
+# rolling average wait in last 30, 60 minutes
 df = df.sort_values('x_ArrivalDTTM')
 df['recent_wait_30min'] = df.rolling('30min', on='x_ArrivalDTTM')['Wait'].mean()
 df['recent_wait_60min'] = df.rolling('60min', on='x_ArrivalDTTM')['Wait'].mean()
 
-# === 7) Assemble feature list and clean ===
+
 feature_cols = [
     # arrival & service
     'arrival_delta_min','est_service_time_min','lambda_per_min','mu_per_min',
@@ -98,29 +95,28 @@ feature_cols = [
     # recent history
     'recent_wait_30min','recent_wait_60min'
 ]
-# keep only existing columns
+
 feature_cols = [c for c in feature_cols if c in df.columns]
 
-# drop rows with any missing in features or target
 df = df.dropna(subset=feature_cols + ['Wait'])
 
 
 X = df[feature_cols]
 y = df['Wait']
 
-# === 8) Train/test split ===
+
 X_train, X_test, y_train, y_test = train_test_split(
     X, y, test_size=0.2, random_state=42
 )
 
-# === 8a) Simple baseline for context ===
+#Test baseline
 baseline_pred = np.full_like(y_test, y_train.mean(), dtype=float)
 baseline_rmse = np.sqrt(mean_squared_error(y_test, baseline_pred))
 baseline_mae = mean_absolute_error(y_test, baseline_pred)
 print(f"Baseline (predict mean) RMSE: {baseline_rmse:.2f} minutes")
 print(f"Baseline (predict mean) MAE:  {baseline_mae:.2f} minutes")
 
-# === 9) Random Forest with hyper-parameter search ===
+# RF
 param_dist = {
     'n_estimators': [100,200,500],
     'max_depth': [None,10,20],
@@ -148,7 +144,7 @@ print(f"RF Median AE: {rf_medae:.2f} minutes")
 print(f"RF 90th percentile AE: {rf_p90:.2f} minutes")
 print(f"RF R^2: {rf_r2:.3f}")
 
-# === 10) Gradient Boosting baseline ===
+# HGB
 gb = HistGradientBoostingRegressor(
     max_iter=200, learning_rate=0.1, random_state=42
 )
@@ -165,6 +161,6 @@ print(f"HGB Median AE: {gb_medae:.2f} minutes")
 print(f"HGB 90th percentile AE: {gb_p90:.2f} minutes")
 print(f"HGB R^2: {gb_r2:.3f}")
 
-# === 11) Save models ===
+
 joblib.dump(best_rf, r"C:\Users\mhdto\OneDrive\Documents\Project DWT\rf_model.joblib")
 joblib.dump(gb,     r"C:\Users\mhdto\OneDrive\Documents\Project DWT\gb_model.joblib")

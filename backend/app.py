@@ -3,18 +3,14 @@ from pydantic import BaseModel
 import joblib
 import numpy as np
 
-# Load the trained model (adjust path if needed)
 model = joblib.load(r"C:\Users\mhdto\OneDrive\Documents\Project DWT\backend\gb_model.joblib")
 
-# Create the FastAPI app
 app = FastAPI()
 
-# Root route just to confirm server is alive
 @app.get("/")
 def read_root():
     return {"message": "Welcome to the wait-time predictor API!"}
 
-# Define input features (just a few example fields — expand this to match your model)
 class InputData(BaseModel):
     arrival_delta_min: float
     est_service_time_min: float
