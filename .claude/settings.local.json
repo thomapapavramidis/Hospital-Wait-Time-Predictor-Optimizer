@@ -1,0 +1,12 @@
+{
+  "permissions": {
+    "allow": [
+      "Bash(dir /b \"c:\\Users\\mhdto\\OneDrive\\Documents\\Project DWT\\*.py\")",
+      "Bash(ls:*)",
+      "Bash(python:*)",
+      "Bash(pip install:*)"
+    ],
+    "deny": [],
+    "ask": []
+  }
+}
