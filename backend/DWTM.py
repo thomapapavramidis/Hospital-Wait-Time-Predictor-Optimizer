@@ -55,7 +55,7 @@ df = df.merge(events_df, left_on='sched_date', right_on='date', how='left')
 df['is_event'] = df['event'].notna()
 df.drop(columns=['date','event'], inplace=True)
 
-# Queue-status features 
+# Queue-status features (Maybe tweak later?????)
 queue_cols = [
     'SumHowEarlyWaiting','AvgHowEarlyWaiting',
     'LineCount0','LineCount1','LineCount2','LineCount3','LineCount4',
@@ -109,7 +109,7 @@ feature_cols = [c for c in feature_cols if c in df.columns]
 df = df.dropna(subset=feature_cols + ['Wait'])
 
 
-# Chronological split for lookahead leakage
+# Chronological split for lookahead leakage (smh)
 split_idx = int(len(df) * 0.8)
 train_df = df.iloc[:split_idx]
 test_df = df.iloc[split_idx:]
@@ -129,7 +129,7 @@ y_test_raw = test_df['Wait']
 
 # Transform for modeling; cap extremes to reduce variance, then invert after prediction.
 y_train_capped = y_train_raw.clip(lower=-180, upper=180)
-y_test_capped = y_test_raw.clip(lower=-180, upper=180)  # metrics still use uncapped y_test_raw
+y_test_capped = y_test_raw.clip(lower=-180, upper=180)  # metrics still use uncapped y_test_raw!!!
 y_train = signed_log1p(y_train_capped)
 y_test = signed_log1p(y_test_capped)
 
@@ -200,7 +200,7 @@ rf_preds = signed_expm1(rf_preds_log)
 print("RF best params:", rf_search.best_params_)
 summarize("RF", y_test_raw, rf_preds)
 
-# HGB tuned via randomized search with early stopping and regularization
+# HGB tuned via randomized search w early stopping and reg
 hgb_param_dist = {
     'learning_rate': [0.02, 0.05, 0.08],
     'max_depth': [3, 6, 9],
@@ -228,7 +228,7 @@ gb_preds = signed_expm1(gb_preds_log)
 print("HGB best params:", hgb_search.best_params_)
 summarize("HGB", y_test_raw, gb_preds)
 
-# Quantile HGB for prediction intervals
+# Quantile HGB for pred intervals
 quantile_alphas = [0.1, 0.5, 0.9]
 quantile_models = {}
 for alpha in quantile_alphas:
