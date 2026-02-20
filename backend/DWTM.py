@@ -78,11 +78,11 @@ df['how_cos']  = np.cos(2*np.pi*df['hour_of_week']/168)
 
 # Recent-history features: rolling averages over past 30/60 minutes.
 df = df.sort_values('x_ArrivalDTTM')
-df['recent_wait_30min'] = df.rolling('30min', on='x_ArrivalDTTM')['Wait'].mean()
-df['recent_wait_60min'] = df.rolling('60min', on='x_ArrivalDTTM')['Wait'].mean()
+df['recent_wait_30min'] = df.rolling('30min', on='x_ArrivalDTTM')['Wait'].mean().shift(1)
+df['recent_wait_60min'] = df.rolling('60min', on='x_ArrivalDTTM')['Wait'].mean().shift(1)
 # Additional short/long lags and trend
-df['recent_wait_15min'] = df.rolling('15min', on='x_ArrivalDTTM')['Wait'].mean()
-df['recent_wait_120min'] = df.rolling('120min', on='x_ArrivalDTTM')['Wait'].mean()
+df['recent_wait_15min'] = df.rolling('15min', on='x_ArrivalDTTM')['Wait'].mean().shift(1)
+df['recent_wait_120min'] = df.rolling('120min', on='x_ArrivalDTTM')['Wait'].mean().shift(1)
 df['last_wait'] = df['Wait'].shift(1)
 df['recent_wait_trend'] = df['recent_wait_30min'] - df['recent_wait_120min']
 
